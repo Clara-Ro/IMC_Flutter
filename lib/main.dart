@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:imc_flutter/database/database_interface.dart';
+import 'package:imc_flutter/database/sqlite_impl.dart';
 import 'package:imc_flutter/history.dart';
 import 'package:imc_flutter/imcs.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const MyApp());
@@ -27,9 +30,26 @@ class _IMCState extends State<IMC> {
   double weight = 1;
   double height = 1;
   double imc = 1;
-  List<IMCs> imcs = [];
   String result = '';
   bool isOpen = false;
+  SharedPreferences? cache;
+  TextEditingController heightController = TextEditingController();
+  late Database db;
+
+  @override
+  void initState() {
+    super.initState();
+    initCache();
+    db = SQLiteImpl();
+  }
+
+  Future<void> initCache () async{
+    cache = await SharedPreferences.getInstance();
+    setState(() async {
+      height =  cache!.getDouble("height") ?? 1;
+      heightController.text = height.toStringAsFixed(2);
+    });
+  }
 
   void calculateIMC(){
     setState(() {
@@ -47,13 +67,16 @@ class _IMCState extends State<IMC> {
       } else {
         result = ('Você está com obesidade grau 3.');
       }
-      imcs.add(IMCs(weight,height,imc,result));
+      db.addIMC(IMCs(weight,height,imc,result));
     });
   }
 
   void setHeight(value){
     setState((){
       height = double.parse(value);
+      if (cache != null) {
+        cache!.setDouble("height", height);
+      }
     });
   }
 
@@ -86,6 +109,7 @@ class _IMCState extends State<IMC> {
               padding: const EdgeInsets.all(8.0),
               child: TextField(
                 onChanged: setHeight,
+                controller: heightController,
                 style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(
                   enabledBorder: OutlineInputBorder(
@@ -147,7 +171,7 @@ class _IMCState extends State<IMC> {
                   onPressed: (){
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context)=> HistoryIMC(imcs: imcs))
+                      MaterialPageRoute(builder: (context)=> HistoryIMC(db: db))
                     );
                   }, 
                   style: ButtonStyle(backgroundColor: MaterialStateProperty.all(Colors.deepPurple[400])),
